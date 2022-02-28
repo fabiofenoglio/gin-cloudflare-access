@@ -2,6 +2,8 @@
 
 [![Documentation](https://godoc.org/github.com/fabiofenoglio/gin-cloudflare-access?status.svg)](http://godoc.org/github.com/fabiofenoglio/gin-cloudflare-access)
 [![Go Report Card](https://goreportcard.com/badge/github.com/fabiofenoglio/gin-cloudflare-access)](https://goreportcard.com/report/github.com/fabiofenoglio/gin-cloudflare-access)
+[![CircleCI](https://circleci.com/gh/fabiofenoglio/gin-cloudflare-access/tree/main.svg?style=shield)](https://circleci.com/gh/fabiofenoglio/gin-cloudflare-access/tree/main)
+[![Coverage Status](https://coveralls.io/repos/github/fabiofenoglio/gin-cloudflare-access/badge.svg?branch=main)](https://coveralls.io/github/fabiofenoglio/gin-cloudflare-access?branch=main)
 
 A middleware plugin for securing a Gin application behind [Cloudflare Access](https://www.cloudflare.com/teams/access/) authentication.
 
