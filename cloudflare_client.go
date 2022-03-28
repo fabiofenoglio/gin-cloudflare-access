@@ -11,6 +11,10 @@ import (
 	resty "github.com/go-resty/resty/v2"
 )
 
+const (
+	TypeApp = "app"
+)
+
 // CloudflareAccessClient is a component that verifies the provided JWT token
 // against Cloudflare verification APIs.
 //
@@ -111,11 +115,6 @@ func (s *cloudflareAccessClientImpl) BuildPrincipal(ctx context.Context, raw str
 		return nil, fmt.Errorf("error parsing jwt claim: %w", err)
 	}
 
-	identity, err := s.fetchIdentity(ctx, raw, token)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching user identity: %v", err)
-	}
-
 	cfToken := CloudflareJWT{
 		RawToken: token,
 
@@ -128,12 +127,26 @@ func (s *cloudflareAccessClientImpl) BuildPrincipal(ctx context.Context, raw str
 		Email:         localClaims.Email,
 		IdentityNonce: localClaims.IdentityNonce,
 		Country:       localClaims.Country,
+
+		Type:       localClaims.Type,
+		CommonName: localClaims.CommonName,
+	}
+
+	var identity *CloudflareIdentity
+
+	if cfToken.IsUser() {
+		fetchedIdentity, err := s.fetchIdentity(ctx, raw, token)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching user identity: %v", err)
+		}
+		identity = fetchedIdentity
 	}
 
 	principal := CloudflareAccessPrincipal{
-		Token:    &cfToken,
-		Identity: identity,
-		Email:    localClaims.Email,
+		Token:      &cfToken,
+		Identity:   identity,
+		Email:      localClaims.Email,
+		CommonName: localClaims.CommonName,
 	}
 
 	return &principal, nil
@@ -216,9 +229,10 @@ type CloudflareIdentityGroup struct {
 }
 
 type CloudflareAccessPrincipal struct {
-	Token    *CloudflareJWT      `json:"token"`
-	Identity *CloudflareIdentity `json:"identity"`
-	Email    string              `json:"email"`
+	Token      *CloudflareJWT      `json:"token"`
+	Identity   *CloudflareIdentity `json:"identity"`
+	Email      string              `json:"email"`
+	CommonName string              `json:"common_name"`
 }
 
 type CloudflareJWT struct {
@@ -231,6 +245,8 @@ type CloudflareJWT struct {
 	Email         string        `json:"email"`
 	IdentityNonce string        `json:"identity_nonce"`
 	Country       string        `json:"country"`
+	Type          string        `json:"type"`
+	CommonName    string        `json:"common_name"`
 }
 
 // JWTClaims is the model holding the claims
@@ -239,4 +255,38 @@ type jwtClaims struct {
 	Email         string `json:"email"`
 	IdentityNonce string `json:"identity_nonce"`
 	Country       string `json:"country"`
+	Type          string `json:"type"`
+	CommonName    string `json:"common_name"`
+}
+
+// IsApplication returns True if the principal
+// of the token is a human user with a valid email.
+func (t *CloudflareJWT) IsUser() bool {
+	return t.Type != TypeApp && t.CommonName == "" && t.Email != ""
+}
+
+// IsApplication returns True if the principal
+// of the token is an application authenticated
+// via a service token or certificate.
+func (t *CloudflareJWT) IsApplication() bool {
+	return t.Type == TypeApp && t.CommonName != "" && t.Email == ""
+}
+
+// IsApplication returns True if the principal
+// of the token is a human user with a valid email.
+func (t *CloudflareAccessPrincipal) IsUser() bool {
+	if t.Token == nil {
+		return false
+	}
+	return t.Token.IsUser()
+}
+
+// IsApplication returns True if the principal
+// of the token is an application authenticated
+// via a service token or certificate.
+func (t *CloudflareAccessPrincipal) IsApplication() bool {
+	if t.Token == nil {
+		return false
+	}
+	return t.Token.IsApplication()
 }
