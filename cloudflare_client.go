@@ -233,6 +233,7 @@ type CloudflareAccessPrincipal struct {
 	Identity   *CloudflareIdentity `json:"identity"`
 	Email      string              `json:"email"`
 	CommonName string              `json:"common_name"`
+	Details    interface{}
 }
 
 type CloudflareJWT struct {
@@ -259,7 +260,7 @@ type jwtClaims struct {
 	CommonName    string `json:"common_name"`
 }
 
-// IsApplication returns True if the principal
+// IsUser returns True if the principal
 // of the token is a human user with a valid email.
 func (t *CloudflareJWT) IsUser() bool {
 	return t.Type != TypeApp && t.CommonName == "" && t.Email != ""
@@ -272,7 +273,7 @@ func (t *CloudflareJWT) IsApplication() bool {
 	return t.Type == TypeApp && t.CommonName != "" && t.Email == ""
 }
 
-// IsApplication returns True if the principal
+// IsUser returns True if the principal
 // of the token is a human user with a valid email.
 func (t *CloudflareAccessPrincipal) IsUser() bool {
 	if t.Token == nil {

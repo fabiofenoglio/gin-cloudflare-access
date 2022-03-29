@@ -102,6 +102,16 @@ func buildAuthenticatorMiddleware(instance *cloudflareAccessMiddlewareImpl) gin.
 			return
 		}
 
+		// If a custom details fetcher is provided, invoke it
+		if instance.config.DetailsFetcher != nil {
+			fetchedDetails, err := instance.config.DetailsFetcher(c, principal)
+			if err != nil {
+				instance.handleUnauthorized(c, fmt.Errorf("error loading user details: %v", err))
+				return
+			}
+			principal.Details = fetchedDetails
+		}
+
 		// Set the principal in the call context and proceed
 		c.Set(cloudflareAccessContextKeyPrincipal, principal)
 
