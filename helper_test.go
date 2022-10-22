@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -161,7 +161,7 @@ func defaultMockSignedToken() string {
 func mockSignedToken(input mockedTokenOptions) string {
 	jwk := jose.JSONWebKey{}
 
-	bytes, err := ioutil.ReadFile(fmt.Sprintf("./mock/jwk_private_%s.json", input.KeyId))
+	bytes, err := os.ReadFile(fmt.Sprintf("./mock/jwk_private_%s.json", input.KeyId))
 	if err != nil {
 		panic(err)
 	}
@@ -250,7 +250,7 @@ func mockPublicKeySet() oidc.KeySet {
 	}
 
 	jwk := jose.JSONWebKey{}
-	bytes, err := ioutil.ReadFile("./mock/jwk_public_1.json")
+	bytes, err := os.ReadFile("./mock/jwk_public_1.json")
 	if err != nil {
 		panic(err)
 	}
@@ -261,7 +261,7 @@ func mockPublicKeySet() oidc.KeySet {
 	keyset.Keys = append(keyset.Keys, jwk)
 
 	jwk2 := jose.JSONWebKey{}
-	bytes, err = ioutil.ReadFile("./mock/jwk_public_2.json")
+	bytes, err = os.ReadFile("./mock/jwk_public_2.json")
 	if err != nil {
 		panic(err)
 	}
