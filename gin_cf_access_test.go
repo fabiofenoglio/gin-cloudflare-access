@@ -1,6 +1,7 @@
 package gincloudflareaccess
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -13,7 +14,7 @@ func buildTestRouter(r *gin.Engine, cfAccess CloudflareAccessMiddleware) {
 	helloHandler := func(c *gin.Context) {
 		principal := GetPrincipal(c)
 		if principal != nil {
-			c.JSON(200, "hello "+principal.Identity.Email)
+			c.JSON(200, "hello "+principal.Email)
 		} else {
 			c.JSON(200, "hello guest")
 		}
@@ -25,7 +26,7 @@ func buildTestRouter(r *gin.Engine, cfAccess CloudflareAccessMiddleware) {
 	r.GET("/", helloHandler)
 
 	secured := r.Group("/secured", cfAccess.RequireAuthenticated())
-
+	secured.GET("/hello", helloHandler)
 	secured.GET("/whoami", func(c *gin.Context) {
 		principal := GetPrincipal(c)
 		c.JSON(200, principal)
@@ -65,7 +66,7 @@ func buildTestRouter(r *gin.Engine, cfAccess CloudflareAccessMiddleware) {
 		if principal == nil {
 			return errors.New("auth required")
 		}
-		if c.Request.Header.Get("X-Mock-Allow") != principal.Identity.Email {
+		if c.Request.Header.Get("X-Mock-Allow") != principal.Email {
 			return errors.New("required custom header not valid")
 		}
 		return nil
@@ -369,4 +370,73 @@ func TestTokenExtractor(t *testing.T) {
 
 	assert.Equal(t, 200, w.Code)
 	assert.Equal(t, "\"hello user@organization.com\"", w.Body.String())
+}
+
+func TestCustomAuthenticationFunc(t *testing.T) {
+	r := gin.Default()
+
+	cfAccess := NewCloudflareAccessMiddleware(&Config{
+		TeamDomain: "organization",
+		ValidAudiences: []string{
+			"myorganizationaudience123123123123",
+		},
+
+		keySet:          mockPublicKeySet(),
+		identityFetcher: mockIdentityFetcher(),
+
+		TokenExtractFunc: func(c *gin.Context) (string, error) {
+			return c.Request.Header.Get("X-Mocked-Auth"), nil
+		},
+
+		AuthenticationFunc: func(ctx context.Context, s string) (*CloudflareAccessPrincipal, error) {
+			return &CloudflareAccessPrincipal{
+				Identity: &CloudflareIdentity{
+					Email: s + "@mock.com",
+					Name:  "some mocked user",
+					Groups: []CloudflareIdentityGroup{
+						{
+							Id:    "group0",
+							Name:  "Some Group",
+							Email: "somegroup@mock.com",
+						},
+					},
+				},
+				Email:      s + "@mock.com",
+				CommonName: "user " + s,
+			}, nil
+		},
+	})
+
+	buildTestRouter(r, cfAccess)
+
+	headerValue := "000"
+
+	// call / as guest
+	req, _ := http.NewRequest("GET", "/", nil)
+	w := serveRequest(r, req)
+	assert.Equal(t, 200, w.Code)
+	assert.Equal(t, "\"hello guest\"", w.Body.String())
+
+	// call /group0/hello as guest
+	req, _ = http.NewRequest("GET", "/group0/hello", nil)
+	w = serveRequest(r, req)
+
+	assert.Equal(t, 401, w.Code)
+	assert.Equal(t, "{\"error\":\"Unauthorized\",\"message\":\"authentication required\",\"status\":401}", w.Body.String())
+
+	// call /secured/hello as default mock user
+	req, _ = http.NewRequest("GET", "/secured/hello", nil)
+	req.Header.Add("X-Mocked-Auth", headerValue)
+	w = serveRequest(r, req)
+
+	assert.Equal(t, 200, w.Code)
+	assert.Equal(t, "\"hello 000@mock.com\"", w.Body.String())
+
+	// call /group0/hello as default mock user
+	req, _ = http.NewRequest("GET", "/group0/hello", nil)
+	req.Header.Add("X-Mocked-Auth", headerValue)
+	w = serveRequest(r, req)
+
+	assert.Equal(t, 403, w.Code)
+	assert.Equal(t, "{\"error\":\"Forbidden\",\"message\":\"forbidden\",\"status\":403}", w.Body.String())
 }

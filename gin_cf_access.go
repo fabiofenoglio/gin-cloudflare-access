@@ -42,6 +42,15 @@ type Config struct {
 	// The request will be aborted if the function returns a non-nil error.
 	TokenExtractFunc func(c *gin.Context) (string, error)
 
+	// If for some reason you want to customize the token verification and principal builder
+	// instead of performing the standard JWK verification process,
+	// you can provide the AuthenticationFunc parameter.
+	//
+	// The function should accept a raw token, validate it and return a corresponding
+	// *CloudflareAccessPrincipal in case the token is valid.
+	// If token is invalid it should return a non-nil error.
+	AuthenticationFunc func(context.Context, string) (*CloudflareAccessPrincipal, error)
+
 	// By default, principals authenticated from a token are cached in memory
 	// for a short duration.
 	// You can disable the caching mechanism by providing the DisableCache parameter.

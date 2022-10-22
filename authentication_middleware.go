@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
 )
@@ -86,16 +87,25 @@ func buildAuthenticatorMiddleware(instance *cloudflareAccessMiddlewareImpl) gin.
 			}
 		}
 
-		// Verify the access token
-		token, err := instance.cloudflareAccessClient.VerifyToken(c.Request.Context(), accessJWT)
-		if err != nil {
-			// Token verification failed. We block the call right now.
-			instance.handleUnauthorized(c, err)
-			return
-		}
+		var token *oidc.IDToken
+		var principal *CloudflareAccessPrincipal
 
-		// Build the principal from token
-		principal, err := instance.cloudflareAccessClient.BuildPrincipal(c.Request.Context(), accessJWT, token)
+		if instance.config.AuthenticationFunc != nil {
+
+			principal, err = instance.config.AuthenticationFunc(c.Request.Context(), accessJWT)
+
+		} else {
+			// Verify the access token
+			token, err = instance.cloudflareAccessClient.VerifyToken(c.Request.Context(), accessJWT)
+			if err != nil {
+				// Token verification failed. We block the call right now.
+				instance.handleUnauthorized(c, err)
+				return
+			}
+
+			// Build the principal from token
+			principal, err = instance.cloudflareAccessClient.BuildPrincipal(c.Request.Context(), accessJWT, token)
+		}
 		if err != nil {
 			// Principal identification failed. We block the call and return the error right now.
 			instance.handleUnauthorized(c, fmt.Errorf("error building principal from token: %v", err))
@@ -103,7 +113,7 @@ func buildAuthenticatorMiddleware(instance *cloudflareAccessMiddlewareImpl) gin.
 		}
 
 		// If a custom details fetcher is provided, invoke it
-		if instance.config.DetailsFetcher != nil {
+		if principal != nil && instance.config.DetailsFetcher != nil {
 			fetchedDetails, err := instance.config.DetailsFetcher(c, principal)
 			if err != nil {
 				instance.handleUnauthorized(c, fmt.Errorf("error loading user details: %v", err))

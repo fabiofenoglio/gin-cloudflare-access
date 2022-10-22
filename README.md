@@ -264,21 +264,92 @@ cfAccess := gincloudflareaccess.NewCloudflareAccessMiddleware(&gincloudflareacce
 
 ```go
 cfAccess := gincloudflareaccess.NewCloudflareAccessMiddleware(&gincloudflareaccess.Config{
+TeamDomain: "myorganization",
+ValidAudiences: []string{
+"123123123123123123123123123123123123123",
+},
+
+// By default principals authenticated from a token are cached in memory
+// for a short duration.
+// You can disable the caching mechanism by providing the DisableCache parameter.
+DisableCache: false,
+
+// By default principals authenticated from a token are cached in memory
+// for 5 minutes.
+// You can change this duration with the CacheTTL parameter.
+CacheTTL: 2 * time.Minute,
+})
+```
+
+### Mock for development purposes
+
+You can provide a custom `AuthenticationFunc` if you want to mock authentication for development purposes.
+
+```go
+settings := &gincloudflareaccess.Config{
 	TeamDomain: "myorganization",
 	ValidAudiences: []string{
 		"123123123123123123123123123123123123123",
 	},
-	
-	// By default principals authenticated from a token are cached in memory
-	// for a short duration.
-	// You can disable the caching mechanism by providing the DisableCache parameter.
-	DisableCache: false,
+}
 
-	// By default principals authenticated from a token are cached in memory
-	// for 5 minutes.
-	// You can change this duration with the CacheTTL parameter.
-	CacheTTL: 2 * time.Minute,
-})
+if (inDevelopment) {
+	settings.AuthenticationFunc = func(ctx context.Context, _ string) (*CloudflareAccessPrincipal, error) {
+		return &CloudflareAccessPrincipal{
+			Identity: &CloudflareIdentity{
+				Email: "user@mock.com",
+				Name:  "some mocked user",
+				Groups: []CloudflareIdentityGroup{
+					{
+						Id:    "group0",
+						Name:  "Some Group",
+						Email: "somegroup@mock.com",
+					},
+				},
+			},
+			Email: "user@mock.com",
+		}, nil
+	}
+}
+
+cfAccess := gincloudflareaccess.NewCloudflareAccessMiddleware(settings)
+```
+
+You might also pass both `AuthenticationFunc` and `TokenExtractFunc` to have a more dynamic mocking logic:
+
+```go
+settings := &gincloudflareaccess.Config{
+	TeamDomain: "myorganization",
+	ValidAudiences: []string{
+		"123123123123123123123123123123123123123",
+	},
+}
+
+if (inDevelopment) {
+	settings.TokenExtractFunc = func(c *gin.Context) (string, error) {
+		// the content of X-Mocked-Auth will be passed as 'inputFromHeader' to the AuthenticationFunc
+		return c.Request.Header.Get("X-Mocked-Auth"), nil
+	}
+	
+	settings.AuthenticationFunc = func(ctx context.Context, inputFromHeader string) (*CloudflareAccessPrincipal, error) {
+		return &CloudflareAccessPrincipal{
+			Identity: &CloudflareIdentity{
+				Email: inputFromHeader + "@mock.com",
+				Name:  "user " + inputFromHeader,
+				Groups: []CloudflareIdentityGroup{
+					{
+						Id:    "group0",
+						Name:  "Some Group",
+						Email: "somegroup@mock.com",
+					},
+				},
+			},
+			Email: inputFromHeader + "@mock.com",
+		}, nil
+	}
+}
+
+cfAccess := gincloudflareaccess.NewCloudflareAccessMiddleware(settings)
 ```
 
 ## Full example
