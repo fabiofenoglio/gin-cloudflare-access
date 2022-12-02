@@ -263,7 +263,7 @@ type jwtClaims struct {
 // IsUser returns True if the principal
 // of the token is a human user with a valid email.
 func (t *CloudflareJWT) IsUser() bool {
-	return t.Type != TypeApp && t.CommonName == "" && t.Email != ""
+	return t.CommonName == "" && t.Email != ""
 }
 
 // IsApplication returns True if the principal
