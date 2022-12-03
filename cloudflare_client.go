@@ -222,11 +222,7 @@ type CloudflareIdentityGeographical struct {
 	Country string `json:"country"`
 }
 
-type CloudflareIdentityGroup struct {
-	Id    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
+type CloudflareIdentityGroup interface{}
 
 type CloudflareAccessPrincipal struct {
 	Token      *CloudflareJWT      `json:"token"`

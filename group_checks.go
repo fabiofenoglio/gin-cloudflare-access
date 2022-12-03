@@ -98,6 +98,12 @@ func principalInAnyGroups(principal *CloudflareAccessPrincipal, groups []string)
 	return false
 }
 
-func groupMatches(group *CloudflareIdentityGroup, query string) bool {
-	return group.Email == query || group.Id == query
+func groupMatches(cfgroup *CloudflareIdentityGroup, query string) bool {
+	switch group := (*cfgroup).(type) {
+		case map[string]interface{}:
+			return group["email"] == query || group["id"] == query
+		case string:
+			return group == query
+		}
+	return false
 }
