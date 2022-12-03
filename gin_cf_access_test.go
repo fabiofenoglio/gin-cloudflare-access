@@ -374,7 +374,12 @@ func TestTokenExtractor(t *testing.T) {
 
 func TestCustomAuthenticationFunc(t *testing.T) {
 	r := gin.Default()
-
+	groups := make([]interface{}, 1)
+	groups[0] = map[string]interface{}{
+		"id":    "group0",
+		"name":  "Some Group",
+		"email": "somegroup@mock.com",
+	}
 	cfAccess := NewCloudflareAccessMiddleware(&Config{
 		TeamDomain: "organization",
 		ValidAudiences: []string{
@@ -391,15 +396,9 @@ func TestCustomAuthenticationFunc(t *testing.T) {
 		AuthenticationFunc: func(ctx context.Context, s string) (*CloudflareAccessPrincipal, error) {
 			return &CloudflareAccessPrincipal{
 				Identity: &CloudflareIdentity{
-					Email: s + "@mock.com",
-					Name:  "some mocked user",
-					Groups: []CloudflareIdentityGroup{
-						{
-							Id:    "group0",
-							Name:  "Some Group",
-							Email: "somegroup@mock.com",
-						},
-					},
+					Email:  s + "@mock.com",
+					Name:   "some mocked user",
+					Groups: groups,
 				},
 				Email:      s + "@mock.com",
 				CommonName: "user " + s,

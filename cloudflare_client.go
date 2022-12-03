@@ -210,7 +210,7 @@ type CloudflareIdentity struct {
 	IssuedAt           int                             `json:"iat"`
 	Idp                *CloudflareIdentityProvider     `json:"idp"`
 	Geographical       *CloudflareIdentityGeographical `json:"geo"`
-	Groups             []CloudflareIdentityGroup       `json:"groups"`
+	Groups             []interface{}                   `json:"groups"`
 }
 
 type CloudflareIdentityProvider struct {
@@ -222,7 +222,6 @@ type CloudflareIdentityGeographical struct {
 	Country string `json:"country"`
 }
 
-type CloudflareIdentityGroup interface{}
 
 type CloudflareAccessPrincipal struct {
 	Token      *CloudflareJWT      `json:"token"`

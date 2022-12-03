@@ -67,6 +67,31 @@ func defaultMockedTokenOptions() *mockedTokenOptions {
 	}
 }
 
+func mockedGroups() []interface{} {
+	ldapGroups := []map[string]interface{}{
+		{
+			"id":    "groupid000",
+			"name":  "Group 0",
+			"email": "group0@organization.com",
+		},
+		{
+			"id":    "groupid001",
+			"name":  "Group 1",
+			"email": "group1@organization.com",
+		},
+		{
+			"id":    "groupid002",
+			"name":  "Group 2",
+			"email": "group2@organization.com",
+		}}
+	result := make([]interface{}, len(ldapGroups))
+	for i, d := range ldapGroups {
+		result[i] = interface{}(d)
+	}
+	return result
+
+}
+
 func mockPrincipal(tokenOptions *mockedTokenOptions) *CloudflareAccessPrincipal {
 	parsedtoken := mockParsedToken(tokenOptions)
 	identity := mockIdentity(tokenOptions)
@@ -126,23 +151,7 @@ func mockIdentity(tokenOptions *mockedTokenOptions) *CloudflareIdentity {
 		Geographical: &CloudflareIdentityGeographical{
 			Country: "IT",
 		},
-		Groups: []CloudflareIdentityGroup{
-			{
-				Id:    "groupid000",
-				Name:  "Group 0",
-				Email: "group0@organization.com",
-			},
-			{
-				Id:    "groupid001",
-				Name:  "Group 1",
-				Email: "group1@organization.com",
-			},
-			{
-				Id:    "groupid002",
-				Name:  "Group 2",
-				Email: "group2@organization.com",
-			},
-		},
+		Groups: mockedGroups(),
 	}
 
 	return &out
