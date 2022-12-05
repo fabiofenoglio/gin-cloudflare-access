@@ -155,12 +155,12 @@ func (s *cloudflareAccessClientImpl) BuildPrincipal(ctx context.Context, raw str
 // extractGroups makes an HTTP call to a specific endpoint in order to extract the list
 // of groups that the user belongs to.
 func (s *cloudflareAccessClientImpl) fetchIdentity(ctx context.Context, raw string, token *oidc.IDToken) (*CloudflareIdentity, error) {
-	// fetching from https://<teamDomain>.cloudflareaccess.com/cdn-cgi/access/get-identity
 	if s.config.identityFetcher != nil {
 		return s.config.identityFetcher(ctx, raw, token)
 	}
 
-	var identityResponse CloudflareIdentity
+	// fetching from https://<teamDomain>.cloudflareaccess.com/cdn-cgi/access/get-identity
+	var identityResponse cloudflareIdentityResponse
 
 	client := resty.New()
 
@@ -188,10 +188,128 @@ func (s *cloudflareAccessClientImpl) fetchIdentity(ctx context.Context, raw stri
 		return nil, fmt.Errorf("got HTTP server error reading user groups: %v %v", resp.StatusCode(), resp.Status())
 	}
 
-	return &identityResponse, nil
+	mappedGroups, err := mapIDPGroupsToCloudflareGroups(identityResponse.RawGroups)
+	if err != nil {
+		return nil, fmt.Errorf("error building access groups from IDP groups: %w", err)
+	}
+
+	return &CloudflareIdentity{
+		Id:                 identityResponse.Id,
+		Name:               identityResponse.Name,
+		Email:              identityResponse.Email,
+		UserUUID:           identityResponse.UserUUID,
+		AccountId:          identityResponse.AccountId,
+		IP:                 identityResponse.IP,
+		AuthStatus:         identityResponse.AuthStatus,
+		CommonName:         identityResponse.CommonName,
+		ServiceTokenId:     identityResponse.ServiceTokenId,
+		ServiceTokenStatus: identityResponse.ServiceTokenStatus,
+		IsWarp:             identityResponse.IsWarp,
+		IsGateway:          identityResponse.IsGateway,
+		Version:            identityResponse.Version,
+		DeviceSessions:     identityResponse.DeviceSessions,
+		IssuedAt:           identityResponse.IssuedAt,
+		Idp:                identityResponse.Idp,
+		Geographical:       identityResponse.Geographical,
+		Groups:             mappedGroups,
+	}, nil
 }
 
-// CloudflareIdentity is the REST model for the response holding the user identity
+func mapIDPGroupsToCloudflareGroups(rawGroupsEntry interface{}) ([]CloudflareIdentityGroup, error) {
+	if rawGroupsEntry == nil {
+		return []CloudflareIdentityGroup{}, nil
+	}
+
+	rawGroups, isArray := rawGroupsEntry.([]interface{})
+	if !isArray {
+		return nil, errors.New("groups entry is not an array")
+	}
+
+	out := make([]CloudflareIdentityGroup, 0, len(rawGroups))
+
+	for _, rawGroup := range rawGroups {
+		mapped, err := mapIDPGroupToCloudflareGroup(rawGroup)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, mapped)
+	}
+
+	return out, nil
+}
+
+func mapIDPGroupToCloudflareGroup(rawGroup interface{}) (CloudflareIdentityGroup, error) {
+
+	if asString, ok := rawGroup.(string); ok {
+		return CloudflareIdentityGroup{
+			Id:    asString,
+			Name:  asString,
+			Email: "",
+		}, nil
+	}
+
+	if asMap, ok := rawGroup.(map[string]interface{}); ok {
+		mapped := CloudflareIdentityGroup{}
+
+		if v, hasField := asMap["id"]; hasField {
+			if vAsString, fieldIsString := v.(string); fieldIsString && vAsString != "" {
+				mapped.Id = vAsString
+			}
+		}
+		if v, hasField := asMap["name"]; hasField {
+			if vAsString, fieldIsString := v.(string); fieldIsString && vAsString != "" {
+				mapped.Name = vAsString
+			}
+		}
+		if v, hasField := asMap["email"]; hasField {
+			if vAsString, fieldIsString := v.(string); fieldIsString && vAsString != "" {
+				mapped.Email = vAsString
+			}
+		}
+
+		if mapped.Id != "" || mapped.Email != "" {
+			if mapped.Name == "" {
+				if mapped.Email != "" {
+					mapped.Name = mapped.Email
+				} else if mapped.Id != "" {
+					mapped.Name = mapped.Id
+				}
+			}
+			if mapped.Id == "" {
+				if mapped.Email != "" {
+					mapped.Id = mapped.Email
+				}
+			}
+			return mapped, nil
+		}
+	}
+
+	return CloudflareIdentityGroup{}, errors.New("unknown format for IDP group entry")
+}
+
+// cloudflareIdentityResponse is the REST model for the response holding the user identity
+type cloudflareIdentityResponse struct {
+	Id                 string                          `json:"id"`
+	Name               string                          `json:"name"`
+	Email              string                          `json:"email"`
+	UserUUID           string                          `json:"user_uuid"`
+	AccountId          string                          `json:"account_id"`
+	IP                 string                          `json:"ip"`
+	AuthStatus         string                          `json:"auth_status"`
+	CommonName         string                          `json:"common_name"`
+	ServiceTokenId     string                          `json:"service_token_id"`
+	ServiceTokenStatus bool                            `json:"service_token_status"`
+	IsWarp             bool                            `json:"is_warp"`
+	IsGateway          bool                            `json:"is_gateway"`
+	Version            int                             `json:"version"`
+	DeviceSessions     map[string]interface{}          `json:"device_sessions"`
+	IssuedAt           int                             `json:"iat"`
+	Idp                *CloudflareIdentityProvider     `json:"idp"`
+	Geographical       *CloudflareIdentityGeographical `json:"geo"`
+	RawGroups          interface{}                     `json:"groups"`
+}
+
+// CloudflareIdentity is the model for the user identity
 type CloudflareIdentity struct {
 	Id                 string                          `json:"id"`
 	Name               string                          `json:"name"`
